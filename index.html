@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>LedgerRam — Keuangan Bulanan</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B0D10">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:#0B0D10;
+    --panel:#14171B;
+    --panel2:#1B1F24;
+    --line:#262B31;
+    --text:#EAEAE6;
+    --muted:#8B9199;
+    --mint:#5FD9A4;
+    --mint-soft:rgba(95,217,164,0.12);
+    --coral:#E8735F;
+    --coral-soft:rgba(232,115,95,0.12);
+    --gold:#D9B25F;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    background:var(--bg); color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    overscroll-behavior-y:none;
+  }
+  body{
+    max-width:480px; margin:0 auto; min-height:100vh;
+    display:flex; flex-direction:column;
+    padding-bottom:92px;
+  }
+
+  header{
+    padding:22px 20px 20px;
+    border-bottom:1px solid var(--line);
+  }
+  .brand-row{
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .brand{
+    font-family:'Sora',sans-serif; font-weight:700; font-size:15px;
+    letter-spacing:0.02em; color:var(--text);
+    display:flex; align-items:center; gap:7px;
+  }
+  .brand .dot{ width:7px; height:7px; border-radius:50%; background:var(--mint); display:inline-block; }
+  .month-nav{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); font-weight:500; }
+  .month-nav button{
+    background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    width:26px; height:26px; border-radius:8px; font-size:14px; cursor:pointer; line-height:1;
+    flex-shrink:0;
+  }
+  .icon-btn{
+    background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    width:30px; height:30px; border-radius:8px; font-size:14px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .icon-btn.blind-on{ background:var(--gold); color:#1A1204; border-color:var(--gold); }
+  .date-label-btn{
+    background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    padding:0 12px; height:30px; border-radius:8px; font-size:12.5px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:6px; font-weight:500;
+    flex:1; min-width:0; white-space:nowrap;
+  }
+  .date-label-btn span:last-child{ overflow:hidden; text-overflow:ellipsis; }
+
+  .total-card{
+    background:linear-gradient(160deg, var(--panel2), var(--panel));
+    border-color:rgba(95,217,164,0.35);
+  }
+  .total-card-value{
+    font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:500;
+    color:var(--text); letter-spacing:-0.01em; word-break:break-word;
+  }
+  .total-card-sub{ font-size:12px; color:var(--muted); margin-top:8px; line-height:1.5; }
+
+  .balance-block{ margin-top:20px; display:flex; align-items:flex-end; justify-content:space-between; gap:12px; }
+  .balance-block .balance-main{ min-width:0; }
+
+  /* Blind mode: mask any numeric amount on screen */
+  body.blind .amt,
+  body.blind .balance-value,
+  body.blind .stat-chip .v,
+  body.blind .day-total,
+  body.blind .bd-row .amt,
+  body.blind .total-card-value{
+    filter: blur(7px);
+    user-select:none;
+    transition: filter .15s;
+  }
+  body.blind .amt:active,
+  body.blind .balance-value:active,
+  body.blind .stat-chip .v:active,
+  body.blind .day-total:active,
+  body.blind .bd-row .amt:active,
+  body.blind .total-card-value:active{
+    filter: blur(0);
+  }
+
+  /* Date picker sheet */
+  .sheet-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.55);
+    z-index:30; display:none;
+  }
+  .sheet-backdrop.show{ display:block; }
+  .sheet{
+    position:fixed; left:50%; bottom:0; transform:translateX(-50%);
+    width:100%; max-width:480px;
+    background:var(--panel); border-top:1px solid var(--line);
+    border-radius:20px 20px 0 0; padding:18px 20px calc(20px + env(safe-area-inset-bottom));
+    z-index:31;
+  }
+  .sheet h3{
+    font-family:'Sora',sans-serif; font-size:14px; font-weight:600;
+    margin-bottom:14px; color:var(--text);
+  }
+  .sheet .field{ margin-bottom:14px; }
+  .sheet-actions{ display:flex; gap:10px; }
+  .sheet-actions button{
+    flex:1; padding:12px; border-radius:10px; border:1px solid var(--line);
+    font-family:'Sora',sans-serif; font-weight:600; font-size:13px; cursor:pointer;
+  }
+  .sheet-actions .btn-cancel{ background:var(--panel2); color:var(--muted); }
+  .sheet-actions .btn-apply{ background:var(--mint); color:#0B1F16; border:none; }
+
+  .quick-dates{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .quick-dates .pill{ padding:7px 12px; font-size:12px; }
+
+  .backup-actions{ display:flex; gap:10px; }
+  .btn-outline{
+    flex:1; padding:11px; border-radius:10px; border:1.5px solid var(--line);
+    background:var(--panel2); color:var(--text); font-family:'Sora',sans-serif;
+    font-weight:600; font-size:13px; cursor:pointer; width:100%;
+  }
+  .btn-outline:active{ transform:scale(0.99); }
+  .btn-outline.danger{ border-color:rgba(232,115,95,0.35); color:var(--coral); background:var(--coral-soft); }
+
+  .balance-label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; }
+  .balance-value{
+    font-family:'JetBrains Mono',monospace; font-size:34px; font-weight:500;
+    margin-top:5px; letter-spacing:-0.01em; word-break:break-word;
+  }
+  .balance-value.negative{ color:var(--coral); }
+  .balance-value.positive{ color:var(--text); }
+
+  .stat-row{ display:flex; gap:10px; margin-top:16px; }
+  .stat-chip{
+    flex:1; background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:11px 13px;
+  }
+  .stat-chip .k{ font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; display:flex; align-items:center; gap:5px; }
+  .stat-chip .k .sq{ width:7px; height:7px; border-radius:2px; }
+  .stat-chip.in .sq{ background:var(--mint); }
+  .stat-chip.out .sq{ background:var(--coral); }
+  .stat-chip .v{ font-family:'JetBrains Mono',monospace; font-size:16.5px; margin-top:4px; }
+  .stat-chip.in .v{ color:var(--mint); }
+  .stat-chip.out .v{ color:var(--coral); }
+
+  .tabs{
+    display:flex; margin:16px 20px 0;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:4px;
+  }
+  .tab{
+    flex:1; text-align:center; padding:9px 0; font-size:13px; font-weight:600;
+    color:var(--muted); border-radius:9px; cursor:pointer;
+    font-family:'Sora',sans-serif; transition:background .15s, color .15s;
+  }
+  .tab.active{ background:var(--panel2); color:var(--mint); }
+
+  main{ padding:16px 20px 0; flex:1; }
+  section{ display:none; }
+  section.active{ display:block; }
+
+  .card{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:16px; padding:16px; margin-bottom:14px;
+  }
+  .card h2{
+    font-family:'Sora',sans-serif; font-size:13px; font-weight:600;
+    text-transform:uppercase; letter-spacing:0.06em; color:var(--muted);
+    margin-bottom:12px;
+  }
+
+  .field{ margin-bottom:12px; }
+  .field label{ display:block; font-size:12px; color:var(--muted); margin-bottom:5px; font-weight:500; }
+  .field input, .field select{
+    width:100%; border:1.5px solid var(--line); background:var(--panel2);
+    border-radius:10px; padding:11px 12px; font-size:15px;
+    font-family:'Inter',sans-serif; color:var(--text);
+  }
+  .field input::placeholder{ color:#565C64; }
+  .field input:focus, .field select:focus{ outline:none; border-color:var(--mint); }
+  .field select{ appearance:none; -webkit-appearance:none; }
+  .err-msg{
+    font-size:12px; color:var(--coral); margin-top:6px; display:none;
+  }
+  .err-msg.show{ display:block; }
+
+  .pill-select{ display:flex; gap:8px; flex-wrap:wrap; }
+  .pill{
+    padding:8px 14px; border-radius:20px; border:1.5px solid var(--line);
+    font-size:13px; font-weight:600; cursor:pointer; color:var(--muted);
+    background:var(--panel2);
+  }
+  .pill.selected{ background:var(--gold); color:#1A1204; border-color:var(--gold); }
+
+  /* Grid pemilihan sumber pemasukan: kartu dengan ikon, lebih enak dilihat & disentuh daripada dropdown */
+  .source-grid{
+    display:grid; grid-template-columns:repeat(2, 1fr); gap:9px;
+  }
+  .source-pill{
+    display:flex; align-items:center; gap:9px;
+    padding:12px 12px; border-radius:12px;
+    border:1.5px solid var(--line); background:var(--panel2);
+    cursor:pointer; transition:background .15s, border-color .15s, transform .1s;
+  }
+  .source-pill span:last-child{
+    font-size:13px; font-weight:600; color:var(--muted);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .source-pill .sp-ic{
+    font-size:17px; width:32px; height:32px; flex-shrink:0;
+    border-radius:9px; background:var(--panel);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .source-pill.selected{
+    background:var(--mint-soft); border-color:var(--mint);
+  }
+  .source-pill.selected span:last-child{ color:var(--mint); }
+  .source-pill.selected .sp-ic{ background:rgba(95,217,164,0.18); }
+  .source-pill:active{ transform:scale(0.98); }
+
+  .btn-submit{
+    width:100%; padding:14px; border:none; border-radius:12px;
+    background:var(--mint); color:#0B1F16;
+    font-family:'Sora',sans-serif; font-weight:700; font-size:14px;
+    cursor:pointer; margin-top:4px;
+  }
+  .btn-submit.expense{ background:var(--coral); color:#2A0D07; }
+  .btn-submit:active{ transform:scale(0.99); }
+  .btn-submit:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  .day-group{ margin-bottom:16px; }
+  .day-head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:12px; color:var(--muted); font-weight:600;
+    text-transform:uppercase; letter-spacing:0.04em; padding:0 4px 8px;
+  }
+  .day-head .day-total{ font-family:'JetBrains Mono',monospace; font-weight:500; }
+
+  .entry{
+    display:flex; align-items:center; gap:12px;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:12px 14px; margin-bottom:8px;
+  }
+  .entry .icon{
+    width:38px; height:38px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;
+  }
+  .entry.income .icon{ background:var(--mint-soft); color:var(--mint); }
+  .entry.expense .icon{ background:var(--coral-soft); color:var(--coral); }
+  .entry .info{ flex:1; min-width:0; }
+  .entry .title{ font-size:14px; font-weight:600; }
+  .entry .sub{ font-size:12px; color:var(--muted); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .entry .amt{ font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:500; white-space:nowrap; }
+  .entry.income .amt{ color:var(--mint); }
+  .entry.expense .amt{ color:var(--coral); }
+  .entry .del{ background:none; border:none; color:#3B4148; font-size:18px; cursor:pointer; padding:0 0 0 4px; line-height:1; }
+  .entry .del:active{ color:var(--coral); }
+
+  .empty{ text-align:center; padding:44px 20px; color:var(--muted); }
+  .empty .glyph{ font-size:30px; margin-bottom:10px; opacity:0.7; }
+  .empty p{ font-size:13px; line-height:1.6; }
+
+  .bd-row{ padding:10px 0; border-bottom:1px solid var(--line); }
+  .bd-row:last-child{ border-bottom:none; }
+  .bd-row-top{ display:flex; align-items:center; gap:10px; font-size:13px; }
+  .bd-row .dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .bd-row .name{ flex:1; font-weight:500; }
+  .bd-row .amt{ font-family:'JetBrains Mono',monospace; color:var(--muted); font-size:12.5px; }
+  .bd-bar{ height:6px; border-radius:4px; background:var(--panel2); overflow:hidden; margin-top:7px; }
+  .bd-bar-inner{ height:100%; border-radius:4px; }
+
+  nav.bottom{
+    position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+    width:100%; max-width:480px; background:var(--panel);
+    border-top:1px solid var(--line); display:flex;
+    padding:10px 20px calc(10px + env(safe-area-inset-bottom)); z-index:10;
+  }
+  nav.bottom button{
+    flex:1; background:none; border:none;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    font-family:'Sora',sans-serif; font-size:10.5px; font-weight:600;
+    letter-spacing:0.02em; color:var(--muted); cursor:pointer; text-transform:uppercase;
+  }
+  nav.bottom button .ic{ font-size:19px; }
+  nav.bottom button.active{ color:var(--text); }
+  nav.bottom button.active .ic{ color:var(--mint); }
+
+  .toast{
+    position:fixed; bottom:96px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    padding:10px 18px; border-radius:30px; font-size:13px; font-weight:500;
+    opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+    z-index:20; white-space:nowrap;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast.error{ border-color:var(--coral); color:var(--coral); }
+
+  .save-indicator{
+    display:flex; align-items:center; gap:5px; font-size:10.5px; color:var(--muted);
+    margin-top:14px; opacity:0.8;
+  }
+  .save-indicator .sq{ width:6px; height:6px; border-radius:50%; background:var(--mint); }
+  .save-indicator.saving .sq{ background:var(--gold); animation:pulse 0.9s infinite; }
+  .save-indicator.err .sq{ background:var(--coral); }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  ::selection{ background:var(--mint); color:#0B1F16; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand-row">
+    <div class="brand"><span class="dot"></span>LedgerRam</div>
+  </div>
+  <div class="month-nav" style="margin-top:14px;">
+    <button id="prevMonth">‹</button>
+    <button class="date-label-btn" id="openDatePicker"><span id="monthLabel">Agustus 2026</span></button>
+    <button id="nextMonth">›</button>
+  </div>
+  <div class="balance-block">
+    <div class="balance-main">
+      <div class="balance-label" id="balanceLabel">Saldo bersih bulan ini</div>
+      <div class="balance-value" id="netValue">Rp 0</div>
+    </div>
+    <button class="icon-btn" id="blindToggle" aria-label="Sembunyikan nominal">👁</button>
+  </div>
+  <div class="stat-row">
+    <div class="stat-chip in">
+      <div class="k"><span class="sq"></span>Pemasukan</div>
+      <div class="v" id="totalIncome">Rp 0</div>
+    </div>
+    <div class="stat-chip out">
+      <div class="k"><span class="sq"></span>Pengeluaran</div>
+      <div class="v" id="totalExpense">Rp 0</div>
+    </div>
+  </div>
+  <div class="save-indicator" id="saveIndicator"><span class="sq"></span><span id="saveText">Tersimpan</span></div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="catat">Catat</div>
+  <div class="tab" data-tab="riwayat">Riwayat</div>
+  <div class="tab" data-tab="ringkasan">Ringkasan</div>
+</div>
+
+<main>
+
+  <!-- CATAT -->
+  <section id="tab-catat" class="active">
+    <div class="card">
+      <h2>Pemasukan</h2>
+      <div class="field">
+        <label>Sumber</label>
+        <div class="source-grid" id="incSourcePills">
+          <div class="source-pill selected" data-val="Gaji"><span class="sp-ic">💼</span><span>Gaji</span></div>
+          <div class="source-pill" data-val="Freelance"><span class="sp-ic">💻</span><span>Freelance</span></div>
+          <div class="source-pill" data-val="Bonus"><span class="sp-ic">🎁</span><span>Bonus / THR</span></div>
+          <div class="source-pill" data-val="Hadiah"><span class="sp-ic">🎀</span><span>Hadiah</span></div>
+          <div class="source-pill" data-val="Lainnya"><span class="sp-ic">✱</span><span>Lainnya</span></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Nominal (Rp)</label>
+        <input type="number" id="incAmount" placeholder="0" inputmode="numeric" min="0">
+        <div class="err-msg" id="incErr">Masukkan nominal yang valid (lebih dari 0)</div>
+      </div>
+      <div class="field">
+        <label>Catatan (opsional)</label>
+        <input type="text" id="incNote" placeholder="contoh: gaji bulan Agustus" maxlength="80">
+      </div>
+      <button class="btn-submit" id="addIncome">+ Tambah Pemasukan</button>
+    </div>
+
+    <div class="card">
+      <h2>Pengeluaran</h2>
+      <div class="field">
+        <label>Kategori</label>
+        <div class="pill-select" id="expCategoryPills">
+          <div class="pill selected" data-val="Makanan">🍽️ Makanan</div>
+          <div class="pill" data-val="Transport">🚌 Transport</div>
+          <div class="pill" data-val="Belanja">🛍️ Belanja</div>
+          <div class="pill" data-val="Tagihan">🧾 Tagihan</div>
+          <div class="pill" data-val="Kesehatan">🩹 Kesehatan</div>
+          <div class="pill" data-val="Hiburan">🎬 Hiburan</div>
+          <div class="pill" data-val="Lainnya">✱ Lainnya</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Nominal (Rp)</label>
+        <input type="number" id="expAmount" placeholder="0" inputmode="numeric" min="0">
+        <div class="err-msg" id="expErr">Masukkan nominal yang valid (lebih dari 0)</div>
+      </div>
+      <div class="field">
+        <label>Catatan (opsional)</label>
+        <input type="text" id="expNote" placeholder="contoh: makan siang" maxlength="80">
+      </div>
+      <button class="btn-submit expense" id="addExpense">− Tambah Pengeluaran</button>
+    </div>
+  </section>
+
+  <!-- RIWAYAT -->
+  <section id="tab-riwayat">
+    <div id="historyList"></div>
+  </section>
+
+  <!-- RINGKASAN -->
+  <section id="tab-ringkasan">
+    <div class="card total-card">
+      <h2>Saldo Keseluruhan Terkumpul</h2>
+      <div class="total-card-value" id="allTimeValue">Rp 0</div>
+      <div class="total-card-sub">Akumulasi seluruh pemasukan dan pengeluaran sejak awal pencatatan</div>
+    </div>
+    <div class="card">
+      <h2>Pemasukan per sumber</h2>
+      <div id="incomeBreakdown"></div>
+    </div>
+    <div class="card">
+      <h2>Pengeluaran per kategori</h2>
+      <div id="expenseBreakdown"></div>
+    </div>
+    <div class="card">
+      <h2>Rata-rata harian</h2>
+      <div class="bd-row"><div class="bd-row-top"><span class="name">Pemasukan / hari aktif</span><span class="amt" id="avgIncome">Rp 0</span></div></div>
+      <div class="bd-row"><div class="bd-row-top"><span class="name">Pengeluaran / hari aktif</span><span class="amt" id="avgExpense">Rp 0</span></div></div>
+      <div class="bd-row"><div class="bd-row-top"><span class="name">Hari aktif tercatat</span><span class="amt" id="activeDays">0</span></div></div>
+    </div>
+    <div class="card">
+      <h2>Data &amp; Cadangan</h2>
+      <p style="font-size:12.5px; color:var(--muted); margin-bottom:12px; line-height:1.5;">Data tersimpan hanya di HP ini. Simpan cadangan secara berkala agar tidak hilang kalau HP diganti atau aplikasi dihapus.</p>
+      <div class="backup-actions">
+        <button class="btn-outline" id="exportBtn">⭳ Ekspor Cadangan</button>
+        <button class="btn-outline" id="importBtn">⭱ Impor Cadangan</button>
+      </div>
+      <input type="file" id="importFile" accept=".json,application/json" style="display:none;">
+      <button class="btn-outline danger" id="resetBtn" style="margin-top:8px;">Hapus Semua Data</button>
+    </div>
+  </section>
+
+</main>
+
+<nav class="bottom">
+  <button class="nav-btn active" data-tab="catat"><span class="ic">✎</span>Catat</button>
+  <button class="nav-btn" data-tab="riwayat"><span class="ic">☰</span>Riwayat</button>
+  <button class="nav-btn" data-tab="ringkasan"><span class="ic">◈</span>Ringkasan</button>
+</nav>
+
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
+<div class="sheet" id="datePickerSheet" style="display:none;">
+  <h3>Lihat tanggal tertentu</h3>
+  <div class="quick-dates">
+    <div class="pill" data-quick="today">Hari ini</div>
+    <div class="pill" data-quick="thisMonth">Bulan ini</div>
+    <div class="pill" data-quick="lastMonth">Bulan lalu</div>
+  </div>
+  <div class="field">
+    <label>Pilih tanggal (bulan &amp; tahun akan mengikuti)</label>
+    <input type="date" id="jumpDateInput">
+  </div>
+  <div class="sheet-actions">
+    <button class="btn-cancel" id="cancelDatePicker">Batal</button>
+    <button class="btn-apply" id="applyDatePicker">Tampilkan</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+const STORAGE_KEY = 'ledger:entries';
+const CAT_COLORS = {
+  'Makanan':'#E8735F','Transport':'#5FA8D9','Belanja':'#D9B25F','Tagihan':'#B48CE8',
+  'Kesehatan':'#5FD9C4','Hiburan':'#D95F8C','Lainnya':'#8B9199',
+  'Gaji':'#5FD9A4','Freelance':'#5FC4D9','Bonus':'#D9B25F','Hadiah':'#8CD95F'
+};
+const ICONS_IN = {'Gaji':'💼','Freelance':'💻','Bonus':'🎁','Hadiah':'🎀','Lainnya':'💰'};
+const ICONS_OUT = {'Makanan':'🍽️','Transport':'🚌','Belanja':'🛍️','Tagihan':'🧾','Kesehatan':'🩹','Hiburan':'🎬','Lainnya':'✱'};
+
+let entries = [];
+let currentMonth = new Date();       // controls which month is shown
+let selectedDay = null;              // 'YYYY-MM-DD' when user picked a specific date, else null (whole month)
+let selectedCategory = 'Makanan';
+let selectedSource = 'Gaji';
+let isSaving = false;
+let blindMode = false;
+
+const fmt = n => 'Rp ' + Math.round(Math.abs(n)).toLocaleString('id-ID');
+
+function setSaveIndicator(state){
+  const el = document.getElementById('saveIndicator');
+  const txt = document.getElementById('saveText');
+  el.classList.remove('saving','err');
+  if(state==='saving'){ el.classList.add('saving'); txt.textContent='Menyimpan...'; }
+  else if(state==='error'){ el.classList.add('err'); txt.textContent='Gagal tersimpan — coba lagi'; }
+  else { txt.textContent='Tersimpan'; }
+}
+
+function showToast(msg, isError){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.toggle('error', !!isError);
+  t.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// Skema field disingkat untuk menghemat ruang penyimpanan di HP:
+// t=type('i'/'e'), c=category, a=amount, n=note, d=date('YYYY-MM-DD'), tm=jam:menit dicatat("HH:MM")
+function isValidEntry(e){
+  return e && typeof e === 'object'
+    && (e.t === 'i' || e.t === 'e')
+    && typeof e.c === 'string' && e.c.length > 0
+    && typeof e.a === 'number' && isFinite(e.a) && e.a > 0
+    && typeof e.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.d);
+}
+
+// Ubah entry format lama (dari versi sebelumnya: type/category/amount/note/date) ke format singkat.
+// Ini memastikan data yang sudah tercatat sebelum update ini tidak hilang.
+function migrateOldEntry(e){
+  if(!e || typeof e !== 'object') return null;
+  if(e.t === 'i' || e.t === 'e') return e; // sudah format baru
+  if(e.type === 'income' || e.type === 'expense'){
+    const m = {
+      t: e.type === 'income' ? 'i' : 'e',
+      c: e.category, a: e.amount, d: e.date
+    };
+    if(e.note) m.n = e.note;
+    if(typeof e.createdAt === 'number'){
+      const dd = new Date(e.createdAt);
+      if(!isNaN(dd.getTime())) m.tm = String(dd.getHours()).padStart(2,'0')+':'+String(dd.getMinutes()).padStart(2,'0');
+    }
+    return m;
+  }
+  return null;
+}
+
+async function loadEntries(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed)){
+        entries = parsed.map(migrateOldEntry).filter(isValidEntry);
+      } else {
+        entries = [];
+      }
+    } else {
+      entries = [];
+    }
+  }catch(e){
+    // Data korup atau localStorage tidak tersedia — mulai bersih, jangan crash
+    entries = [];
+  }
+  try{
+    blindMode = localStorage.getItem('ledger:blind') === '1';
+    document.body.classList.toggle('blind', blindMode);
+    document.getElementById('blindToggle').classList.toggle('blind-on', blindMode);
+    document.getElementById('blindToggle').textContent = blindMode ? '🙈' : '👁';
+  }catch(e){ /* ignore, default is off */ }
+  render();
+}
+
+async function saveEntries(retry){
+  isSaving = true;
+  setSaveIndicator('saving');
+  try{
+    const payload = JSON.stringify(entries);
+    localStorage.setItem(STORAGE_KEY, payload);
+    // Verifikasi tulisan benar-benar tersimpan (deteksi storage penuh/gagal diam-diam)
+    const check = localStorage.getItem(STORAGE_KEY);
+    if(check !== payload){
+      throw new Error('Verifikasi penyimpanan gagal');
+    }
+    setSaveIndicator('ok');
+    isSaving = false;
+    return true;
+  }catch(e){
+    isSaving = false;
+    if(!retry){
+      return await saveEntries(true);
+    }
+    setSaveIndicator('error');
+    showToast('Gagal menyimpan data. Memori penyimpanan mungkin penuh.', true);
+    return false;
+  }
+}
+
+const MONTH_NAMES = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const DAY_NAMES = ['Minggu','Senin','Selasa','Rabu','Kamis',"Jum'at",'Sabtu'];
+
+function monthKey(d){ return d.getFullYear()+'-'+d.getMonth(); }
+
+// Entries visible right now: either the whole selected month, or one specific day if selectedDay is set
+function entriesInView(){
+  if(selectedDay){
+    return entries.filter(e => e.d === selectedDay);
+  }
+  return entries.filter(e=>{
+    const ed = new Date(e.d + 'T00:00:00');
+    return ed.getFullYear()===currentMonth.getFullYear() && ed.getMonth()===currentMonth.getMonth();
+  });
+}
+
+function updateMonthLabel(){
+  const labelEl = document.getElementById('monthLabel');
+  const balanceLabelEl = document.getElementById('balanceLabel');
+  if(selectedDay){
+    const d = new Date(selectedDay + 'T00:00:00');
+    labelEl.textContent = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+    balanceLabelEl.textContent = `Saldo bersih — ${DAY_NAMES[d.getDay()]}, ${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+  } else {
+    labelEl.textContent = MONTH_NAMES[currentMonth.getMonth()] + ' ' + currentMonth.getFullYear();
+    balanceLabelEl.textContent = 'Saldo bersih bulan ini';
+  }
+}
+
+function render(){
+  updateMonthLabel();
+  const viewEntries = entriesInView();
+  const income = viewEntries.filter(e=>e.t==='i').reduce((s,e)=>s+e.a,0);
+  const expense = viewEntries.filter(e=>e.t==='e').reduce((s,e)=>s+e.a,0);
+  const net = income - expense;
+
+  const netEl = document.getElementById('netValue');
+  netEl.textContent = (net<0? '−' : '') + fmt(net);
+  netEl.classList.toggle('negative', net<0);
+  netEl.classList.toggle('positive', net>=0);
+
+  document.getElementById('totalIncome').textContent = fmt(income);
+  document.getElementById('totalExpense').textContent = fmt(expense);
+
+  // Saldo keseluruhan: dihitung dari SEMUA transaksi sepanjang waktu, bukan cuma bulan yang ditampilkan
+  const allIncome = entries.filter(e=>e.t==='i').reduce((s,e)=>s+e.a,0);
+  const allExpense = entries.filter(e=>e.t==='e').reduce((s,e)=>s+e.a,0);
+  const allNet = allIncome - allExpense;
+  const allEl = document.getElementById('allTimeValue');
+  allEl.textContent = (allNet<0? '−' : '') + fmt(allNet);
+  allEl.style.color = allNet<0 ? 'var(--coral)' : 'var(--text)';
+
+  renderHistory(viewEntries);
+  renderSummary(viewEntries);
+}
+
+function renderHistory(monthEntries){
+  const container = document.getElementById('historyList');
+  if(monthEntries.length===0){
+    const msg = selectedDay
+      ? 'Belum ada catatan untuk tanggal ini.'
+      : 'Belum ada catatan bulan ini.<br>Mulai catat pemasukan atau pengeluaranmu di tab Catat.';
+    container.innerHTML = `<div class="empty"><div class="glyph">📒</div><p>${msg}</p></div>`;
+    return;
+  }
+  // Urut berdasar tanggal lalu jam (tm) turun — yang terbaru di atas
+  const sorted = [...monthEntries].sort((a,b)=> b.d.localeCompare(a.d) || (b.tm||'').localeCompare(a.tm||''));
+  const byDay = {};
+  sorted.forEach(e=>{
+    if(!byDay[e.d]) byDay[e.d]=[];
+    byDay[e.d].push(e);
+  });
+
+  const dayNames = DAY_NAMES;
+  const monNames = MONTH_NAMES;
+  let html = '';
+  Object.keys(byDay).forEach(dateKey=>{
+    const items = byDay[dateKey];
+    const d = new Date(dateKey + 'T00:00:00');
+    const dayTotal = items.reduce((s,e)=> s + (e.t==='i'? e.a : -e.a), 0);
+    // Tanggal lengkap: nama hari, tanggal, nama bulan, tahun
+    const label = `${dayNames[d.getDay()]}, ${d.getDate()} ${monNames[d.getMonth()]} ${d.getFullYear()}`;
+    html += `<div class="day-group"><div class="day-head"><span>${escapeHtml(label)}</span><span class="day-total" style="color:${dayTotal>=0?'#5FD9A4':'#E8735F'}">${dayTotal>=0?'+':'−'}${fmt(dayTotal)}</span></div>`;
+    items.forEach((e, idxInDay)=>{
+      const globalIdx = entries.indexOf(e);
+      const icon = e.t==='i' ? (ICONS_IN[e.c]||'💰') : (ICONS_OUT[e.c]||'✱');
+      const noteText = e.n ? escapeHtml(e.n) : (e.t==='i'?'Pemasukan':'Pengeluaran');
+      const timeText = e.tm ? escapeHtml(e.tm) : '';
+      html += `<div class="entry ${e.t==='i'?'income':'expense'}">
+        <div class="icon">${icon}</div>
+        <div class="info">
+          <div class="title">${escapeHtml(e.c)}</div>
+          <div class="sub">${noteText}${timeText ? ' · '+timeText : ''}</div>
+        </div>
+        <div class="amt">${e.t==='i'?'+':'−'}${fmt(e.a)}</div>
+        <button class="del" data-idx="${globalIdx}" aria-label="Hapus">×</button>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  container.innerHTML = html;
+
+  container.querySelectorAll('.del').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const idx = parseInt(btn.getAttribute('data-idx'), 10);
+      if(isNaN(idx) || idx < 0 || idx >= entries.length) return;
+      const backup = entries;
+      entries = entries.slice(0, idx).concat(entries.slice(idx+1));
+      const ok = await saveEntries();
+      if(!ok){
+        entries = backup; // rollback so nothing gets silently lost
+        render();
+        return;
+      }
+      render();
+      showToast('Catatan dihapus');
+    });
+  });
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function renderBreakdown(container, items, total){
+  if(items.length===0 || total===0){
+    container.innerHTML = `<div class="empty" style="padding:16px 0;"><p style="font-size:12px;">Belum ada data.</p></div>`;
+    return;
+  }
+  const grouped = {};
+  items.forEach(e=>{ grouped[e.c] = (grouped[e.c]||0) + e.a; });
+  const sorted = Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
+  let html = '';
+  sorted.forEach(([cat, amt])=>{
+    const pct = (amt/total*100);
+    const color = CAT_COLORS[cat] || '#8B9199';
+    html += `<div class="bd-row">
+      <div class="bd-row-top">
+        <span class="dot" style="background:${color}"></span>
+        <span class="name">${escapeHtml(cat)}</span>
+        <span class="amt">${fmt(amt)} · ${pct.toFixed(0)}%</span>
+      </div>
+      <div class="bd-bar"><div class="bd-bar-inner" style="width:${Math.min(pct,100)}%; background:${color}"></div></div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function renderSummary(monthEntries){
+  const incomeItems = monthEntries.filter(e=>e.t==='i');
+  const expenseItems = monthEntries.filter(e=>e.t==='e');
+  const incomeTotal = incomeItems.reduce((s,e)=>s+e.a,0);
+  const expenseTotal = expenseItems.reduce((s,e)=>s+e.a,0);
+
+  renderBreakdown(document.getElementById('incomeBreakdown'), incomeItems, incomeTotal);
+  renderBreakdown(document.getElementById('expenseBreakdown'), expenseItems, expenseTotal);
+
+  const activeDaysSet = new Set(monthEntries.map(e=>e.d));
+  const activeDays = activeDaysSet.size;
+  document.getElementById('activeDays').textContent = activeDays;
+  document.getElementById('avgIncome').textContent = fmt(activeDays ? incomeTotal/activeDays : 0);
+  document.getElementById('avgExpense').textContent = fmt(activeDays ? expenseTotal/activeDays : 0);
+}
+
+// --- Tab switching ---
+function switchTab(name){
+  document.querySelectorAll('section').forEach(s=>s.classList.remove('active'));
+  const target = document.getElementById('tab-'+name);
+  if(target) target.classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.nav-btn').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+}
+document.querySelectorAll('.tab, .nav-btn').forEach(el=>{
+  el.addEventListener('click', ()=> switchTab(el.dataset.tab));
+});
+
+// --- Month nav ---
+document.getElementById('prevMonth').addEventListener('click', ()=>{
+  if(selectedDay){
+    // geser satu hari ke belakang saat sedang melihat tanggal spesifik
+    const d = new Date(selectedDay + 'T00:00:00');
+    d.setDate(d.getDate()-1);
+    selectedDay = toDateStr(d);
+    currentMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  } else {
+    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1, 1);
+  }
+  render();
+});
+document.getElementById('nextMonth').addEventListener('click', ()=>{
+  if(selectedDay){
+    const d = new Date(selectedDay + 'T00:00:00');
+    d.setDate(d.getDate()+1);
+    selectedDay = toDateStr(d);
+    currentMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  } else {
+    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1, 1);
+  }
+  render();
+});
+
+// --- Category pills ---
+document.querySelectorAll('#expCategoryPills .pill').forEach(p=>{
+  p.addEventListener('click', ()=>{
+    document.querySelectorAll('#expCategoryPills .pill').forEach(x=>x.classList.remove('selected'));
+    p.classList.add('selected');
+    selectedCategory = p.dataset.val;
+  });
+});
+
+// --- Source pills (pemasukan) ---
+document.querySelectorAll('#incSourcePills .source-pill').forEach(p=>{
+  p.addEventListener('click', ()=>{
+    document.querySelectorAll('#incSourcePills .source-pill').forEach(x=>x.classList.remove('selected'));
+    p.classList.add('selected');
+    selectedSource = p.dataset.val;
+  });
+});
+
+// Validasi tanggal dari <input type="date">: kalau kosong/format salah, jatuhkan ke hari ini
+// supaya tidak pernah tersimpan tanggal yang rusak/undefined
+function normalizeDateInput(raw){
+  if(typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)){
+    const d = new Date(raw + 'T00:00:00');
+    if(!isNaN(d.getTime())) return raw;
+  }
+  return todayStr();
+}
+
+function parseAmount(raw){
+  const n = parseFloat(raw);
+  if(isNaN(n) || !isFinite(n) || n <= 0) return null;
+  return Math.round(n * 100) / 100;
+}
+
+function toDateStr(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function todayStr(){
+  return toDateStr(new Date());
+}
+
+// Jam saat dicatat, format singkat "HH:MM" (2 karakter lebih hemat daripada timestamp 13-digit)
+function nowTime(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+let addingIncome = false;
+let addingExpense = false;
+
+// --- Add income ---
+document.getElementById('addIncome').addEventListener('click', async ()=>{
+  if(addingIncome) return;
+  const btn = document.getElementById('addIncome');
+  const errEl = document.getElementById('incErr');
+  const type = selectedSource;
+  const amountInput = document.getElementById('incAmount');
+  const note = document.getElementById('incNote').value.trim().slice(0,80);
+  const amount = parseAmount(amountInput.value);
+  const chosenDate = todayStr(); // dicatat otomatis pada tanggal hari ini
+
+  if(amount === null){
+    errEl.classList.add('show');
+    amountInput.focus();
+    return;
+  }
+  errEl.classList.remove('show');
+
+  addingIncome = true;
+  btn.disabled = true;
+  const newEntry = { t:'i', c: type, a: amount, d: chosenDate, tm: nowTime() };
+  if(note) newEntry.n = note;
+  const backup = entries;
+  entries = [...entries, newEntry];
+  const ok = await saveEntries();
+  addingIncome = false;
+  btn.disabled = false;
+
+  if(!ok){
+    entries = backup;
+    render();
+    return;
+  }
+  amountInput.value='';
+  document.getElementById('incNote').value='';
+  currentMonth = new Date();
+  selectedDay = null;
+  render();
+  showToast('Pemasukan ditambahkan');
+});
+
+// --- Add expense ---
+document.getElementById('addExpense').addEventListener('click', async ()=>{
+  if(addingExpense) return;
+  const btn = document.getElementById('addExpense');
+  const errEl = document.getElementById('expErr');
+  const amountInput = document.getElementById('expAmount');
+  const note = document.getElementById('expNote').value.trim().slice(0,80);
+  const amount = parseAmount(amountInput.value);
+  const chosenDate = todayStr(); // dicatat otomatis pada tanggal hari ini
+
+  if(amount === null){
+    errEl.classList.add('show');
+    amountInput.focus();
+    return;
+  }
+  errEl.classList.remove('show');
+
+  addingExpense = true;
+  btn.disabled = true;
+  const newEntry = { t:'e', c: selectedCategory, a: amount, d: chosenDate, tm: nowTime() };
+  if(note) newEntry.n = note;
+  const backup = entries;
+  entries = [...entries, newEntry];
+  const ok = await saveEntries();
+  addingExpense = false;
+  btn.disabled = false;
+
+  if(!ok){
+    entries = backup;
+    render();
+    return;
+  }
+  amountInput.value='';
+  document.getElementById('expNote').value='';
+  currentMonth = new Date();
+  selectedDay = null;
+  render();
+  showToast('Pengeluaran dicatat');
+});
+
+// Clear error message once the user starts fixing the field
+document.getElementById('incAmount').addEventListener('input', ()=> document.getElementById('incErr').classList.remove('show'));
+document.getElementById('expAmount').addEventListener('input', ()=> document.getElementById('expErr').classList.remove('show'));
+
+// --- Blind mode toggle: sembunyikan semua nominal dari orang di sekitar ---
+document.getElementById('blindToggle').addEventListener('click', ()=>{
+  blindMode = !blindMode;
+  document.body.classList.toggle('blind', blindMode);
+  const btn = document.getElementById('blindToggle');
+  btn.classList.toggle('blind-on', blindMode);
+  btn.textContent = blindMode ? '🙈' : '👁';
+  try{ localStorage.setItem('ledger:blind', blindMode ? '1' : '0'); }catch(e){ /* non-fatal */ }
+  showToast(blindMode ? 'Nominal disembunyikan — tap angka untuk intip sekilas' : 'Nominal ditampilkan');
+});
+
+// --- Date picker sheet: lompat langsung ke tanggal tertentu ---
+const sheetBackdrop = document.getElementById('sheetBackdrop');
+const datePickerSheet = document.getElementById('datePickerSheet');
+const jumpDateInput = document.getElementById('jumpDateInput');
+
+function openSheet(){
+  jumpDateInput.value = selectedDay || todayStr();
+  jumpDateInput.max = todayStr();
+  sheetBackdrop.classList.add('show');
+  datePickerSheet.style.display = 'block';
+}
+function closeSheet(){
+  sheetBackdrop.classList.remove('show');
+  datePickerSheet.style.display = 'none';
+}
+
+document.getElementById('openDatePicker').addEventListener('click', openSheet);
+document.getElementById('cancelDatePicker').addEventListener('click', closeSheet);
+sheetBackdrop.addEventListener('click', closeSheet);
+
+document.querySelectorAll('.quick-dates .pill').forEach(p=>{
+  p.addEventListener('click', ()=>{
+    const kind = p.dataset.quick;
+    const now = new Date();
+    if(kind==='today'){
+      jumpDateInput.value = todayStr();
+    } else if(kind==='thisMonth'){
+      selectedDay = null;
+      currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      closeSheet();
+      render();
+      return;
+    } else if(kind==='lastMonth'){
+      selectedDay = null;
+      currentMonth = new Date(now.getFullYear(), now.getMonth()-1, 1);
+      closeSheet();
+      render();
+      return;
+    }
+  });
+});
+
+document.getElementById('applyDatePicker').addEventListener('click', ()=>{
+  const chosen = normalizeDateInput(jumpDateInput.value);
+  selectedDay = chosen;
+  const d = new Date(chosen + 'T00:00:00');
+  currentMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  closeSheet();
+  switchTab('riwayat');
+  render();
+});
+
+// --- Ekspor cadangan: unduh semua data sebagai file .json ---
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  try{
+    if(entries.length === 0){
+      showToast('Belum ada data untuk dicadangkan');
+      return;
+    }
+    const payload = JSON.stringify({ app:'ledger', version:2, exportedAt: todayStr(), entries }, null, 0);
+    const blob = new Blob([payload], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ledger-cadangan-${todayStr()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    showToast('Cadangan diunduh');
+  }catch(e){
+    showToast('Gagal membuat cadangan', true);
+  }
+});
+
+// --- Impor cadangan: gabungkan data dari file .json ke data yang ada ---
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  document.getElementById('importFile').click();
+});
+document.getElementById('importFile').addEventListener('change', (ev)=>{
+  const file = ev.target.files && ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async ()=>{
+    try{
+      const parsed = JSON.parse(reader.result);
+      const incoming = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.entries) ? parsed.entries : null);
+      if(!incoming){
+        showToast('File cadangan tidak dikenali', true);
+        return;
+      }
+      const migrated = incoming.map(migrateOldEntry).filter(isValidEntry);
+      if(migrated.length === 0){
+        showToast('Tidak ada data valid di file ini', true);
+        return;
+      }
+      const backup = entries;
+      // Gabungkan tanpa duplikat kasar: cocokkan berdasar tanggal+jam+jumlah+kategori
+      const key = e => `${e.d}|${e.tm||''}|${e.t}|${e.c}|${e.a}`;
+      const existingKeys = new Set(entries.map(key));
+      const toAdd = migrated.filter(e => !existingKeys.has(key(e)));
+      entries = entries.concat(toAdd);
+      const ok = await saveEntries();
+      if(!ok){
+        entries = backup;
+        render();
+        showToast('Gagal menyimpan data impor', true);
+        return;
+      }
+      render();
+      showToast(`${toAdd.length} catatan berhasil diimpor`);
+    }catch(e){
+      showToast('File cadangan tidak valid', true);
+    }finally{
+      ev.target.value = '';
+    }
+  };
+  reader.onerror = ()=> showToast('Gagal membaca file', true);
+  reader.readAsText(file);
+});
+
+// --- Reset semua data (butuh konfirmasi dua langkah agar tidak terhapus tidak sengaja) ---
+document.getElementById('resetBtn').addEventListener('click', async ()=>{
+  if(entries.length === 0){
+    showToast('Tidak ada data untuk dihapus');
+    return;
+  }
+  const confirmed = confirm('Hapus SEMUA data pemasukan dan pengeluaran? Tindakan ini tidak bisa dibatalkan. Disarankan ekspor cadangan dulu.');
+  if(!confirmed) return;
+  const backup = entries;
+  entries = [];
+  const ok = await saveEntries();
+  if(!ok){
+    entries = backup;
+    render();
+    showToast('Gagal menghapus data', true);
+    return;
+  }
+  selectedDay = null;
+  currentMonth = new Date();
+  render();
+  showToast('Semua data telah dihapus');
+});
+
+// Global safety net: never let an uncaught error take down the UI silently
+window.addEventListener('error', (ev)=>{
+  console.error('Ledger error:', ev.error || ev.message);
+});
+window.addEventListener('unhandledrejection', (ev)=>{
+  console.error('Ledger rejection:', ev.reason);
+});
+
+loadEntries();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
